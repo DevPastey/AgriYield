@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-fraunces: "Fraunces", serif;
+  --font-plex: "IBM Plex Sans", sans-serif;
+}
+
+body {
+  @apply bg-field-50 text-field-900 font-sans antialiased;
+}
+
+/* Tabular figures for anything showing measurements (mm, kg/ha, °C) so
+   numbers don't jiggle horizontally as the dashboard updates. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
