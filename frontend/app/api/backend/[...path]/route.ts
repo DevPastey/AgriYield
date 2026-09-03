@@ -16,8 +16,9 @@ const backendBaseUrl = (
 
 export const dynamic = "force-dynamic";
 
-async function proxy(request: NextRequest, context: { params: { path: string[] } }) {
-  const path = context.params.path.map(encodeURIComponent).join("/");
+async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path: routePath } = await context.params;
+  const path = routePath.map(encodeURIComponent).join("/");
   const upstreamUrl = new URL(`${backendBaseUrl}/${path}`);
   upstreamUrl.search = request.nextUrl.search;
 

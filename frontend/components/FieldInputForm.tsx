@@ -77,9 +77,11 @@ export default function FieldInputForm({ onSubmit, isLoading }: Props) {
     const lat = Number(latitude);
     const lon = Number(longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      setLocationError(null);
-      setIsResolvingLocation(false);
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setLocationError(null);
+        setIsResolvingLocation(false);
+      }, 0);
+      return () => window.clearTimeout(resetTimer);
     }
 
     const controller = new AbortController();
