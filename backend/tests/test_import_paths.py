@@ -10,6 +10,7 @@ def test_evapotranspiration_module_path_is_resolved_when_run_as_script():
         cwd=backend_dir,
         capture_output=True,
         text=True,
+        check=False,
     )
 
     assert result.returncode == 0

@@ -5,7 +5,11 @@ Weather endpoints. Fully implemented — thin wrapper around weather_service.
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.recommendation import DailyWeather, LocationLookup
-from app.services.weather_service import WeatherServiceError, get_seven_day_outlook, reverse_geocode
+from app.services.weather_service import (
+    WeatherServiceError,
+    get_seven_day_outlook,
+    reverse_geocode,
+)
 
 router = APIRouter(prefix="/weather", tags=["weather"])
 

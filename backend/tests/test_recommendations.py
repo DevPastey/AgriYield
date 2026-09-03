@@ -9,7 +9,10 @@ just a working demo. Fill in the TODOs alongside your implementation.
 import pytest
 
 from app.schemas.recommendation import DailyWeather, GrowthStage, SoilTexture
-from app.services.evapotranspiration import calculate_crop_water_requirement, calculate_reference_et
+from app.services.evapotranspiration import (
+    calculate_crop_water_requirement,
+    calculate_reference_et,
+)
 from app.services.fertilizer_engine import calculate_npk_blend
 from app.services.irrigation_engine import generate_irrigation_plan
 

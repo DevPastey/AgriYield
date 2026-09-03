@@ -1,8 +1,11 @@
 """Irrigation planner backed by crop profiles stored in PostgreSQL."""
 
-from datetime import date
-
-from app.schemas.recommendation import DailyWeather, GrowthStage, IrrigationRecommendation, SoilTexture
+from app.schemas.recommendation import (
+    DailyWeather,
+    GrowthStage,
+    IrrigationRecommendation,
+    SoilTexture,
+)
 from app.services.agrony_repository import get_crop_stage_profile
 from app.services.evapotranspiration import calculate_crop_water_requirement
 

@@ -7,15 +7,15 @@ app/services/irrigation_engine.py and app/services/fertilizer_engine.py —
 implement those and this endpoint will work end-to-end.
 """
 
-from datetime import date as date_cls
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.recommendation import (
+    CropOption,
     DailyPlan,
     RecommendationRequest,
     RecommendationResponse,
-    CropOption,
 )
 from app.services import fertilizer_engine, irrigation_engine
 from app.services.crop_catalog import get_supported_crops
@@ -84,7 +84,7 @@ async def create_recommendation(payload: RecommendationRequest):
 
     return RecommendationResponse(
         request=payload,
-        generated_at=date_cls.today(),
+        generated_at=datetime.now(UTC).date(),
         seven_day_plan=daily_plans,
         summary=summary,
     )
