@@ -44,6 +44,17 @@ class RecommendationRequest(BaseModel):
     field_size_hectares: float | None = Field(default=None, gt=0)
 
 
+class CropOption(BaseModel):
+    value: str
+    label: str
+
+
+class LocationLookup(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+
+
 class DailyWeather(BaseModel):
     date: date
     temp_min_c: float
@@ -58,6 +69,7 @@ class IrrigationRecommendation(BaseModel):
     date: date
     should_irrigate: bool
     irrigation_amount_mm: float | None = None
+    crop_water_requirement_mm: float | None = None
     reasoning: str
 
 

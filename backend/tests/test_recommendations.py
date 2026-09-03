@@ -9,6 +9,9 @@ just a working demo. Fill in the TODOs alongside your implementation.
 import pytest
 
 from app.schemas.recommendation import DailyWeather, GrowthStage, SoilTexture
+from app.services.evapotranspiration import calculate_crop_water_requirement, calculate_reference_et
+from app.services.fertilizer_engine import calculate_npk_blend
+from app.services.irrigation_engine import generate_irrigation_plan
 
 
 @pytest.fixture
@@ -25,9 +28,42 @@ def sample_weather() -> DailyWeather:
 
 
 def test_reference_et_is_positive(sample_weather):
-    # TODO: once evapotranspiration.calculate_reference_et is implemented,
-    # assert it returns a sane ET0 value (typically 2-8 mm/day for most climates).
-    pytest.skip("TODO: implement once calculate_reference_et is done")
+    et0 = calculate_reference_et(sample_weather, latitude=7.4, day_of_year=180)
+    assert 1.0 < et0 < 12.0
+
+
+def test_agronomy_engine_returns_reasonable_daily_outputs(sample_weather):
+    et0 = calculate_reference_et(sample_weather, latitude=7.4, day_of_year=180)
+    assert et0 > 0
+
+    etc = calculate_crop_water_requirement(
+        sample_weather,
+        crop_type="maize",
+        growth_stage=GrowthStage.DEVELOPMENT,
+        latitude=7.4,
+        day_of_year=sample_weather.date.timetuple().tm_yday,
+        simplify_for_forecast=True,
+    )
+    assert etc > 0
+
+    plan = generate_irrigation_plan(
+        daily_weather=[sample_weather],
+        latitude=7.4,
+        soil_texture=SoilTexture.LOAM,
+        growth_stage=GrowthStage.DEVELOPMENT,
+        crop_type="maize",
+    )
+    assert len(plan) == 1
+    assert isinstance(plan[0].should_irrigate, bool)
+    assert plan[0].crop_water_requirement_mm == etc
+
+    blend = calculate_npk_blend(
+        crop_type="maize",
+        growth_stage=GrowthStage.DEVELOPMENT,
+        soil_texture=SoilTexture.SAND,
+        recent_rainfall_mm=12.0,
+    )
+    assert blend.nitrogen_kg_per_ha > 0
 
 
 def test_irrigation_triggered_on_dry_high_deficit_day(sample_weather):

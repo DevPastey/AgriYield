@@ -15,7 +15,7 @@ from collections import defaultdict
 from datetime import date, datetime, timezone
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import RetryError, retry, stop_after_attempt, wait_exponential
 
 from app.core.config import get_settings
 from app.schemas.recommendation import DailyWeather
@@ -26,15 +26,53 @@ settings = get_settings()
 # Fine for a portfolio project / single-instance deploy. Swap for Redis if you
 # ever run multiple backend instances.
 _cache: dict[tuple[float, float], tuple[float, list[DailyWeather]]] = {}
+_location_cache: dict[tuple[float, float], str] = {}
 
 
 class WeatherServiceError(RuntimeError):
     """Raised when the upstream weather API can't be reached or returns bad data."""
 
 
+async def reverse_geocode(lat: float, lon: float) -> str:
+    """Resolve coordinates to a concise place label through OpenWeatherMap."""
+    cache_key = (round(lat, 3), round(lon, 3))
+    if cache_key in _location_cache:
+        return _location_cache[cache_key]
+
+    api_key = settings.openweather_api_key or ""
+    if not api_key or api_key.startswith("your_"):
+        raise WeatherServiceError("OPENWEATHER_API_KEY is not set for location lookup.")
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{settings.openweather_geo_url}/reverse",
+                params={"lat": lat, "lon": lon, "limit": 1, "appid": api_key},
+            )
+            response.raise_for_status()
+            results = response.json()
+    except httpx.HTTPStatusError as exc:
+        raise WeatherServiceError(f"Location lookup failed: OpenWeatherMap returned {exc.response.status_code}.") from exc
+    except httpx.HTTPError as exc:
+        raise WeatherServiceError(f"Location lookup connection failed: {exc}") from exc
+
+    if not results:
+        raise WeatherServiceError("No location was found for these coordinates.")
+
+    place = results[0]
+    parts = [place.get("name"), place.get("state"), place.get("country")]
+    location_name = ", ".join(str(part) for part in parts if part)
+    if not location_name:
+        raise WeatherServiceError("Location lookup returned no usable place name.")
+
+    _location_cache[cache_key] = location_name
+    return location_name
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, min=1, max=8))
 async def _fetch_5day_forecast(lat: float, lon: float) -> dict:
-    if not settings.openweather_api_key or settings.openweather_api_key == "your_openweathermap_key_here":
+    api_key = settings.openweather_api_key or ""
+    if not api_key or api_key.startswith("your_"):
         raise WeatherServiceError(
             "OPENWEATHER_API_KEY is not set. Get a free key at "
             "https://home.openweathermap.org/api_keys and put it in backend/.env"
@@ -43,14 +81,22 @@ async def _fetch_5day_forecast(lat: float, lon: float) -> dict:
     params = {
         "lat": lat,
         "lon": lon,
-        "appid": settings.openweather_api_key,
+        "appid": api_key,
         "units": "metric",
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(f"{settings.openweather_base_url}/forecast", params=params)
-        response.raise_for_status()
-        return response.json()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{settings.openweather_base_url}/forecast", params=params)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text[:200] if exc.response is not None else str(exc)
+        raise WeatherServiceError(
+            f"OpenWeatherMap rejected the request: {exc.response.status_code if exc.response else 'unknown status'} - {detail}"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise WeatherServiceError(f"Weather service connection failed: {exc}") from exc
 
 
 def _collapse_to_daily(raw: dict) -> list[DailyWeather]:
@@ -106,7 +152,16 @@ async def get_seven_day_outlook(lat: float, lon: float) -> list[DailyWeather]:
         if now - fetched_at < settings.weather_cache_ttl_seconds:
             return cached_days
 
-    raw = await _fetch_5day_forecast(lat, lon)
+    try:
+        raw = await _fetch_5day_forecast(lat, lon)
+    except RetryError as exc:
+        last_exc = exc.last_attempt.exception() if exc.last_attempt is not None else exc
+        if isinstance(last_exc, WeatherServiceError):
+            raise last_exc from exc
+        raise WeatherServiceError(f"Weather request failed after retrying: {exc}") from exc
+    except WeatherServiceError:
+        raise
+
     daily = _collapse_to_daily(raw)
     _cache[cache_key] = (now, daily)
     return daily

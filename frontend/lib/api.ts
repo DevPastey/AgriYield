@@ -1,12 +1,13 @@
 /**
  * Typed client for the AgriYield-API backend.
  *
- * Fully implemented — points at NEXT_PUBLIC_API_BASE_URL (see .env.local.example).
+ * Requests are sent through the Next.js backend proxy. This keeps the browser on
+ * the dashboard's origin and makes the actual FastAPI host a server-only setting.
  * The shapes here mirror backend/app/schemas/recommendation.py; keep them
  * in sync if you change the backend schemas.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
+const API_BASE_URL = "/api/backend";
 
 export type SoilTexture =
   | "sand"
@@ -44,6 +45,7 @@ export interface IrrigationRecommendation {
   date: string;
   should_irrigate: boolean;
   irrigation_amount_mm: number | null;
+  crop_water_requirement_mm: number | null;
   reasoning: string;
 }
 
@@ -66,6 +68,17 @@ export interface RecommendationResponse {
   generated_at: string;
   seven_day_plan: DailyPlan[];
   summary: string;
+}
+
+export interface CropOption {
+  value: string;
+  label: string;
+}
+
+export interface LocationLookup {
+  name: string;
+  latitude: number;
+  longitude: number;
 }
 
 export class ApiError extends Error {
@@ -96,6 +109,25 @@ export async function fetchWeatherOutlook(lat: number, lon: number): Promise<Dai
   if (!res.ok) {
     const detail = await res.json().catch(() => ({ detail: res.statusText }));
     throw new ApiError(detail.detail ?? "Request failed", res.status);
+  }
+  return res.json();
+}
+
+export async function fetchCrops(): Promise<CropOption[]> {
+  const res = await fetch(`${API_BASE_URL}/recommendations/crops`);
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(detail.detail ?? "Could not load crops", res.status);
+  }
+  return res.json();
+}
+
+export async function fetchLocationName(lat: number, lon: number, signal?: AbortSignal): Promise<LocationLookup> {
+  const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+  const res = await fetch(`${API_BASE_URL}/weather/location?${params}`, { signal });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(detail.detail ?? "Could not resolve location", res.status);
   }
   return res.json();
 }

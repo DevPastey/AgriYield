@@ -24,9 +24,26 @@ export default function RecommendationDetail({ plan }: { plan: DailyPlan[] }) {
           </div>
 
           {day.fertilizer && (
-            <div className="mt-2 flex items-start gap-2">
-              <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-soil-500" />
-              <p className="text-sm text-field-900/80">{day.fertilizer.reasoning}</p>
+            <div className="mt-3 border-t border-field-900/10 pt-3">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-soil-500" />
+                <p className="text-sm font-medium text-field-900/80">Fertilizer recommendation</p>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-md bg-field-900/5 px-2 py-2">
+                  <div className="text-xs text-field-900/50">Nitrogen</div>
+                  <div className="font-display text-base">{day.fertilizer.nitrogen_kg_per_ha.toFixed(1)} kg/ha</div>
+                </div>
+                <div className="rounded-md bg-field-900/5 px-2 py-2">
+                  <div className="text-xs text-field-900/50">Phosphorus</div>
+                  <div className="font-display text-base">{day.fertilizer.phosphorus_kg_per_ha.toFixed(1)} kg/ha</div>
+                </div>
+                <div className="rounded-md bg-field-900/5 px-2 py-2">
+                  <div className="text-xs text-field-900/50">Potassium</div>
+                  <div className="font-display text-base">{day.fertilizer.potassium_kg_per_ha.toFixed(1)} kg/ha</div>
+                </div>
+              </div>
+              <p className="mt-2 text-sm text-field-900/80">{day.fertilizer.reasoning}</p>
             </div>
           )}
         </div>

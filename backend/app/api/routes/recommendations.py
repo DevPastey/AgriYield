@@ -15,15 +15,24 @@ from app.schemas.recommendation import (
     DailyPlan,
     RecommendationRequest,
     RecommendationResponse,
+    CropOption,
 )
 from app.services import fertilizer_engine, irrigation_engine
+from app.services.crop_catalog import get_supported_crops
 from app.services.weather_service import WeatherServiceError, get_seven_day_outlook
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
 
+@router.get("/crops", response_model=list[CropOption])
+async def list_supported_crops():
+    return [CropOption(value=crop, label=crop.replace("_", " ").title()) for crop in get_supported_crops()]
+
+
 @router.post("", response_model=RecommendationResponse)
 async def create_recommendation(payload: RecommendationRequest):
+    if payload.crop_type.strip().lower() not in get_supported_crops():
+        raise HTTPException(status_code=422, detail="The selected crop is not supported for recommendations.")
     try:
         daily_weather = await get_seven_day_outlook(payload.latitude, payload.longitude)
     except WeatherServiceError as exc:
@@ -32,28 +41,24 @@ async def create_recommendation(payload: RecommendationRequest):
     if not daily_weather:
         raise HTTPException(status_code=502, detail="No weather data returned for this location.")
 
-    # --- Irrigation plan (TODO: implemented by you in irrigation_engine.py) ---
     try:
         irrigation_plan = irrigation_engine.generate_irrigation_plan(
             daily_weather=daily_weather,
+            latitude=payload.latitude,
             soil_texture=payload.soil_texture,
             growth_stage=payload.growth_stage,
             crop_type=payload.crop_type,
         )
-    except NotImplementedError as exc:
-        raise HTTPException(
-            status_code=501,
-            detail=f"Irrigation engine not implemented yet: {exc}",
-        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    # --- Fertilizer plan (TODO: implemented by you in fertilizer_engine.py) ---
     daily_plans: list[DailyPlan] = []
     for day_index, (weather, irrigation) in enumerate(zip(daily_weather, irrigation_plan)):
         fertilizer = None
         try:
             if fertilizer_engine.should_apply_fertilizer_today(
                 growth_stage=payload.growth_stage,
-                days_since_last_application=None,  # TODO: track this properly, e.g. via request or DB
+                days_since_last_application=None,
                 day_index_in_plan=day_index,
             ):
                 fertilizer = fertilizer_engine.calculate_npk_blend(
@@ -62,19 +67,24 @@ async def create_recommendation(payload: RecommendationRequest):
                     soil_texture=payload.soil_texture,
                     recent_rainfall_mm=weather.rainfall_mm,
                 )
-        except NotImplementedError:
+        except ValueError as exc:
             # Fertilizer engine not implemented yet — irrigation-only response is still useful.
-            pass
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         daily_plans.append(
             DailyPlan(date=weather.date, weather=weather, irrigation=irrigation, fertilizer=fertilizer)
         )
 
+    irrigated_days = sum(1 for item in daily_plans if item.irrigation.should_irrigate)
+    fertilizer_days = sum(1 for item in daily_plans if item.fertilizer is not None)
+    summary = (
+        f"This plan recommends irrigation on {irrigated_days} day(s) and fertilizer on {fertilizer_days} day(s). "
+        f"Use the crop calendar and day-by-day reasoning to adjust scheduling based on soil moisture and rainfall."
+    )
+
     return RecommendationResponse(
         request=payload,
         generated_at=date_cls.today(),
         seven_day_plan=daily_plans,
-        # TODO: replace with a real human-readable summary once the engines
-        # are implemented, e.g. "Irrigate on 2 of 7 days; apply fertilizer once."
-        summary="TODO: generate a plain-language summary of the week's plan.",
+        summary=summary,
     )

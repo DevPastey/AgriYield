@@ -22,7 +22,7 @@ export default function CropCalendar({ plan }: { plan: DailyPlan[] }) {
     day: formatDay(day.date),
     rainfall: day.weather.rainfall_mm,
     irrigation: day.irrigation.irrigation_amount_mm ?? 0,
-    etc: undefined as number | undefined, // TODO: surface ETc from the backend response if you add it to DailyPlan
+    cropWaterDemand: day.irrigation.crop_water_requirement_mm ?? 0,
   }));
 
   return (
@@ -39,8 +39,14 @@ export default function CropCalendar({ plan }: { plan: DailyPlan[] }) {
           />
           <Bar dataKey="rainfall" name="Rainfall" fill="#2F6E8C" radius={[3, 3, 0, 0]} barSize={16} />
           <Bar dataKey="irrigation" name="Recommended irrigation" fill="#3F6B3B" radius={[3, 3, 0, 0]} barSize={16} />
-          {/* TODO: once evapotranspiration.py returns ETc per day, add a Line
-              here so farmers can see water demand vs. water supplied. */}
+          <Line
+            type="monotone"
+            dataKey="cropWaterDemand"
+            name="Crop water demand (ETc)"
+            stroke="#C9782E"
+            strokeWidth={2}
+            dot={{ r: 3, fill: "#C9782E" }}
+          />
         </ComposedChart>
       </ResponsiveContainer>
 

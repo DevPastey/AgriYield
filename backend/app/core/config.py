@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_name: str = "AgriYield-API"
     api_v1_prefix: str = "/api/v1"
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    database_url: str = ""
 
     # --- OpenWeatherMap ---
     openweather_api_key: str = ""
@@ -30,7 +31,14 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        if isinstance(self.cors_origins, list):
+            origins = self.cors_origins
+        elif isinstance(self.cors_origins, str):
+            origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        else:
+            origins = []
+
+        return origins or ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 
 @lru_cache
