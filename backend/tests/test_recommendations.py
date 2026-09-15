@@ -24,6 +24,8 @@ from app.services.evapotranspiration import (
 from app.services.fertilizer_engine import calculate_npk_blend
 from app.services.irrigation_engine import generate_irrigation_plan
 
+pytestmark = pytest.mark.usefixtures("stub_crop_profiles")
+
 
 @pytest.fixture
 def sample_weather() -> DailyWeather:

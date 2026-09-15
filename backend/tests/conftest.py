@@ -10,7 +10,7 @@ from app.services import (
 from app.services.agrony_repository import CropStageProfile
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def stub_crop_profiles(monkeypatch):
     profile = CropStageProfile(
         name="maize",
