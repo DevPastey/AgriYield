@@ -6,6 +6,14 @@ them is a strong scholarship signal — it shows engineering discipline, not
 just a working demo. Fill in the TODOs alongside your implementation.
 """
 
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    backend_root = Path(__file__).resolve().parents[1]
+    if str(backend_root) not in sys.path:
+        sys.path.insert(0, str(backend_root))
+
 import pytest
 
 from app.schemas.recommendation import DailyWeather, GrowthStage, SoilTexture
@@ -70,19 +78,93 @@ def test_agronomy_engine_returns_reasonable_daily_outputs(sample_weather):
 
 
 def test_irrigation_triggered_on_dry_high_deficit_day(sample_weather):
-    # TODO: construct a scenario where soil moisture deficit clearly exceeds
-    # the management-allowed depletion threshold, and assert
-    # decide_irrigation(...) returns should_irrigate=True.
-    pytest.skip("TODO: implement once irrigation_engine.decide_irrigation is done")
+    dry_days = [
+        DailyWeather(
+            date=f"2026-06-{day:02d}",
+            temp_min_c=30.0,
+            temp_max_c=42.0,
+            humidity_pct=25.0,
+            rainfall_mm=0.0,
+            wind_speed_ms=3.5,
+            condition="Clear",
+        )
+        for day in range(1, 21)
+    ]
+
+    plan = generate_irrigation_plan(
+        daily_weather=dry_days,
+        latitude=7.4,
+        soil_texture=SoilTexture.LOAM,
+        growth_stage=GrowthStage.DEVELOPMENT,
+        crop_type="maize",
+    )
+
+    assert any(day.should_irrigate for day in plan)
+    assert any(day.irrigation_amount_mm is not None and day.irrigation_amount_mm > 0 for day in plan)
+    assert any("refill the root zone" in day.reasoning.lower() for day in plan)
 
 
 def test_no_irrigation_when_rain_is_imminent(sample_weather):
-    # TODO: assert the engine correctly withholds/reduces irrigation when
-    # meaningful rain is forecast in the next day or two.
-    pytest.skip("TODO: implement once irrigation_engine is done")
+    dry_days = [
+        DailyWeather(
+            date=f"2026-06-{day:02d}",
+            temp_min_c=30.0,
+            temp_max_c=42.0,
+            humidity_pct=25.0,
+            rainfall_mm=0.0,
+            wind_speed_ms=3.5,
+            condition="Clear",
+        )
+        for day in range(1, 20)
+    ]
+    rainy_day = DailyWeather(
+        date="2026-06-20",
+        temp_min_c=28.0,
+        temp_max_c=36.0,
+        humidity_pct=65.0,
+        rainfall_mm=12.0,
+        wind_speed_ms=2.0,
+        condition="Rain",
+    )
+    final_day = DailyWeather(
+        date="2026-06-21",
+        temp_min_c=29.0,
+        temp_max_c=38.0,
+        humidity_pct=35.0,
+        rainfall_mm=0.0,
+        wind_speed_ms=2.0,
+        condition="Clear",
+    )
+
+    plan = generate_irrigation_plan(
+        daily_weather=dry_days + [rainy_day, final_day],
+        latitude=7.4,
+        soil_texture=SoilTexture.LOAM,
+        growth_stage=GrowthStage.DEVELOPMENT,
+        crop_type="maize",
+    )
+
+    deferred = next(
+        day for day in plan if not day.should_irrigate and "forecast" in day.reasoning.lower()
+    )
+    assert deferred.date.isoformat() == "2026-06-19"
+    assert deferred.irrigation_amount_mm == 0.0
 
 
 def test_npk_blend_adjusts_for_sandy_soil():
-    # TODO: assert calculate_npk_blend increases nitrogen (or whatever your
-    # agronomy logic dictates) for SoilTexture.SAND vs SoilTexture.CLAY.
-    pytest.skip("TODO: implement once fertilizer_engine.calculate_npk_blend is done")
+    sand_blend = calculate_npk_blend(
+        crop_type="maize",
+        growth_stage=GrowthStage.DEVELOPMENT,
+        soil_texture=SoilTexture.SAND,
+        recent_rainfall_mm=12.0,
+    )
+    clay_blend = calculate_npk_blend(
+        crop_type="maize",
+        growth_stage=GrowthStage.DEVELOPMENT,
+        soil_texture=SoilTexture.CLAY,
+        recent_rainfall_mm=12.0,
+    )
+
+    assert sand_blend.nitrogen_kg_per_ha > clay_blend.nitrogen_kg_per_ha
+    assert sand_blend.nitrogen_kg_per_ha > 0
+    assert clay_blend.nitrogen_kg_per_ha > 0
