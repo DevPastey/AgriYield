@@ -10,5 +10,9 @@ def test_database_engine_is_initialized_lazily(monkeypatch):
     config.get_settings.cache_clear()
     reloaded_database = importlib.reload(database)
 
-    with pytest.raises(RuntimeError, match="DATABASE_URL is required to load agronomic data."):
-        reloaded_database.get_engine()
+    try:
+        with pytest.raises(RuntimeError, match="DATABASE_URL is required to load agronomic data."):
+            reloaded_database.get_engine()
+    finally:
+        reloaded_database.get_engine.cache_clear()
+        config.get_settings.cache_clear()
