@@ -1,5 +1,6 @@
 import pytest
 
+from app.schemas.recommendation import GrowthStage
 from app.services import (
     crop_catalog,
     evapotranspiration,
@@ -23,7 +24,7 @@ def stub_crop_profiles(monkeypatch):
     )
 
     def fake_get_crop_stage_profile(crop_type, growth_stage):
-        if crop_type.strip().lower() != "maize":
+        if crop_type.strip().lower() != "maize" or growth_stage is not GrowthStage.DEVELOPMENT:
             raise ValueError(f"No FAO-56 profile exists for {crop_type!r} at {growth_stage.value!r}.")
         return profile
 
