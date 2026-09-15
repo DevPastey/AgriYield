@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import text
 
-from app.core.database import engine
+from app.core.database import get_engine
 from app.schemas.recommendation import GrowthStage
 
 
@@ -31,7 +31,7 @@ def list_supported_crops() -> list[str]:
         ORDER BY c.name
         """
     )
-    with engine.connect() as connection:
+    with get_engine().connect() as connection:
         return list(connection.execute(statement).scalars())
 
 
@@ -46,7 +46,7 @@ def get_crop_stage_profile(crop_type: str, growth_stage: GrowthStage) -> CropSta
           AND cc.growth_stage = CAST(:growth_stage AS growth_stage)
         """
     )
-    with engine.connect() as connection:
+    with get_engine().connect() as connection:
         row = connection.execute(
             statement,
             {"crop_name": crop_type.strip().lower(), "growth_stage": growth_stage.value},
